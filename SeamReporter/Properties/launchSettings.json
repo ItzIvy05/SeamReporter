@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "SeamReporter": {
+      "commandName": "Project",
+      "commandLineArgs": "run-patcher --GameRelease SkyrimSE --DataFolderPath \"D:\\SteamLibrary\\steamapps\\common\\Skyrim Special Edition\\Data\" --LoadOrderFilePath \"C:\\SeamTest\\plugins.txt\" --OutputPath \"C:\\SeamTest\\SeamReport.esp\""
+    }
+  }
+}
