@@ -1,6 +1,9 @@
 ﻿using Mutagen.Bethesda;
 using Mutagen.Bethesda.Skyrim;
 using Mutagen.Bethesda.Synthesis;
+using Mutagen.Bethesda.Plugins;
+using Mutagen.Bethesda.Plugins.Cache;
+using Noggog;
 
 namespace SeamReporter;
 
@@ -8,6 +11,14 @@ public class Program
 {
     private const int Size = 33;
     private const int Last = 32;
+
+    private sealed class LandCell
+    {
+        public required IModContext<ISkyrimMod, ISkyrimModGetter, ILandscape, ILandscapeGetter> Context {  get; set; }
+        public required float[,] Heights { get; init; }
+        public required float[,] OriginalHeights { get; init; }
+    }
+
     public static async Task<int> Main(string[] args)
     {
         return await SynthesisPipeline.Instance.AddPatch<ISkyrimMod, ISkyrimModGetter>(RunPatch).SetTypicalOpen(GameRelease.SkyrimSE, "SeamReport.esp").Run(args);
