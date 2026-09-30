@@ -48,4 +48,26 @@ public class Program
 
         return heights;
     }
+
+    private static Dictionary<FormKey, Dictionary<P2Int, LandCell>> CollectCells(IPatcherState<ISkyrimMod, ISkyrimModGetter> state)
+    {
+        var worldspaces = new Dictionary<FormKey, Dictionary<P2Int, LandCell>>();
+        foreach (var context in state.LoadOrder.PriorityOrder.Landscape().WinningContextOverrides(state.LinkCache))
+        {
+            var vhgt = context.Record.VertexHeightMap;
+            var originalVhgt = state.LinkCache.ResolveAll<ILandscapeGetter>(context.Record.FormKey).Last().VertexHeightMap;
+
+            if (vhgt is null || originalVhgt is null) {  continue; }
+            if (!context.TryGetParent<ICellGetter>(out var cell) || cell.Grid is null) { continue; }
+            if (!context.TryGetParent<IWorldspaceGetter>(out var worldspace)) {  continue; }
+            if (!worldspaces.TryGetValue(worldspace.FormKey, out var cells))
+            {
+                cells = new Dictionary<P2Int, LandCell>();
+                worldspaces[worldspace.FormKey] = cells;
+            }
+            
+            cells.TryAdd(cell.Grid.Point, new LandCell { Context = context, Heights = Decode(vhgt), OriginalHeights = Decode(originalVhgt) });
+        }
+        return worldspaces;
+    }
 }
