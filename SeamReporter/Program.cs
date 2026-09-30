@@ -11,6 +11,9 @@ public class Program
 {
     private const int Size = 33;
     private const int Last = 32;
+    private const int CellUnits = 4096;
+    private const int PointUnits = 128;
+    private const float MinGapUnits = 8f;
 
     private sealed class LandCell
     {
@@ -19,6 +22,9 @@ public class Program
         public required float[,] OriginalHeights { get; init; }
     }
 
+    private sealed record CellEntry(int X, int Y, string Plugin);
+    private sealed record Point(float X, float y);
+    private sealed record Gap(string? Worldspace, CellEntry CellA, CellEntry CellB, string Edge, int GappedPoints, float LargestGapUnits, Point LargestGapAt, string Console);
     public static async Task<int> Main(string[] args)
     {
         return await SynthesisPipeline.Instance.AddPatch<ISkyrimMod, ISkyrimModGetter>(RunPatch).SetTypicalOpen(GameRelease.SkyrimSE, "SeamReport.esp").Run(args);
@@ -69,5 +75,38 @@ public class Program
             cells.TryAdd(cell.Grid.Point, new LandCell { Context = context, Heights = Decode(vhgt), OriginalHeights = Decode(originalVhgt) });
         }
         return worldspaces;
+    }
+
+    private static Gap? CompareEdge(string? worldspace, P2Int gridA, LandCell a, P2Int gridB, LandCell b, bool east)
+    {
+        var gappedPoints = 0;
+        var largest = 0f;
+        var largestAt = 0;
+        for (var i = 0; i < Size; i++)
+        {
+            var heightA = east ? a.Heights[Last, i] : a.Heights[i, Last];
+            var heightB = east ? b.Heights[0, i] : b.Heights[i, 0];
+            var originalA = east ? a.OriginalHeights[Last, i] : a.OriginalHeights[i, Last];
+            var originalB = east ? b.OriginalHeights[0, i] : b.OriginalHeights[i, 0];
+            var gap = Math.Abs(heightA - heightB);
+            if (gap < MinGapUnits || Math.Abs(originalA - originalB) >= MinGapUnits)
+            {
+                continue;
+            }
+            gappedPoints++;
+            if (gap > largest)
+            {
+                largest = gap;
+                largestAt = i;
+            }
+        }
+        if (gappedPoints == 0)
+        {
+            return null;
+        }
+        var at = east ? new Point(gridB.X * CellUnits, gridA.Y * CellUnits + largestAt * PointUnits) : new Point(gridA.X * CellUnits + largestAt * PointUnits, gridB.Y * CellUnits);
+        var cellA = new CellEntry(gridA.X, gridA.Y, a.Context.ModKey.FileName);
+        var cellB = new CellEntry(gridB.X, gridB.Y, b.Context.ModKey.FileName);
+        return new Gap(worldspace, cellA, cellB, east ? "East" : "North", gappedPoints, largest, at, $"cow {worldspace} {gridA.X} {gridA.Y}");
     }
 }
