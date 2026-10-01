@@ -1,8 +1,9 @@
 ﻿using Mutagen.Bethesda;
-using Mutagen.Bethesda.Skyrim;
-using Mutagen.Bethesda.Synthesis;
 using Mutagen.Bethesda.Plugins;
 using Mutagen.Bethesda.Plugins.Cache;
+using Mutagen.Bethesda.Skyrim;
+using Mutagen.Bethesda.Synthesis;
+using System.Text.Json;
 using Noggog;
 
 namespace SeamReporter;
@@ -14,6 +15,8 @@ public class Program
     private const int CellUnits = 4096;
     private const int PointUnits = 128;
     private const float MinGapUnits = 8f;
+
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     private sealed class LandCell
     {
@@ -32,8 +35,42 @@ public class Program
 
     public static void RunPatch(IPatcherState<ISkyrimMod, ISkyrimModGetter> state)
     {
-
+        var gaps = new List<Gap>();
+        var gappedCells = new HashSet<LandCell>();
+        foreach (var (worldspaceKey, cells) in CollectCells(state))
+        {
+            var worldspace = state.LinkCache.Resolve<IWorldspaceGetter>(worldspaceKey).EditorID;
+            foreach (var (grid, cell) in cells)
+            {
+                foreach (var east in new[] { true, false })
+                {
+                    var neighbourGrid = east ? new P2Int(grid.X + 1, grid.Y) : new P2Int(grid.X, grid.Y + 1);
+                    if (!cells.TryGetValue(neighbourGrid, out var neighbour))
+                    {
+                        continue;
+                    }
+                    var gap = CompareEdge(worldspace, grid, cell, neighbourGrid, neighbour, east);
+                    if (gap is null)
+                    {
+                        continue;
+                    }
+                    gaps.Add(gap);
+                    gappedCells.Add(cell);
+                    gappedCells.Add(neighbour);
+                }
+            }
+        }
+        foreach (var cell in gappedCells)
+        {
+            cell.Context.GetOrAddAsOverride(state.PatchMod);
+        }
+        var reportPath = Path.Combine(state.DataFolderPath, "SeamReport.json");
+        var sorted = gaps.OrderBy(gap => gap.Worldspace).ThenByDescending(gap => gap.LargestGapUnits).ToList();
+        File.WriteAllText(reportPath, JsonSerializer.Serialize(sorted, JsonOptions));
+        Console.WriteLine($"Found {gaps.Count} gapped cell edges, copied {gappedCells.Count} cells into the patch.");
+        Console.WriteLine($"Report written to {reportPath}");
     }
+
     private static float[,] Decode(ILandscapeVertexHeightMapGetter vhgt)
     {
         var heights = new float[Size, Size];
