@@ -20,14 +20,17 @@ public class Program
 
     private sealed class LandCell
     {
-        public required IModContext<ISkyrimMod, ISkyrimModGetter, ILandscape, ILandscapeGetter> Context {  get; set; }
+        public required IModContext<ISkyrimMod, ISkyrimModGetter, ILandscape, ILandscapeGetter> Context { get; init; }
         public required float[,] Heights { get; init; }
         public required float[,] OriginalHeights { get; init; }
     }
 
     private sealed record CellEntry(int X, int Y, string Plugin);
-    private sealed record Point(float X, float y);
+
+    private sealed record Point(float X, float Y);
+
     private sealed record Gap(string? Worldspace, CellEntry CellA, CellEntry CellB, string Edge, int GappedPoints, float LargestGapUnits, Point LargestGapAt, string Console);
+
     public static async Task<int> Main(string[] args)
     {
         return await SynthesisPipeline.Instance.AddPatch<ISkyrimMod, ISkyrimModGetter>(RunPatch).SetTypicalOpen(GameRelease.SkyrimSE, "SeamReport.esp").Run(args);
@@ -100,9 +103,18 @@ public class Program
             var vhgt = context.Record.VertexHeightMap;
             var originalVhgt = state.LinkCache.ResolveAll<ILandscapeGetter>(context.Record.FormKey).Last().VertexHeightMap;
 
-            if (vhgt is null || originalVhgt is null) {  continue; }
-            if (!context.TryGetParent<ICellGetter>(out var cell) || cell.Grid is null) { continue; }
-            if (!context.TryGetParent<IWorldspaceGetter>(out var worldspace)) {  continue; }
+            if (vhgt is null || originalVhgt is null)
+            {
+                continue;
+            }
+            if (!context.TryGetParent<ICellGetter>(out var cell) || cell.Grid is null)
+            {
+                continue;
+            }
+            if (!context.TryGetParent<IWorldspaceGetter>(out var worldspace))
+            {
+                continue;
+            }
             if (!worldspaces.TryGetValue(worldspace.FormKey, out var cells))
             {
                 cells = new Dictionary<P2Int, LandCell>();
